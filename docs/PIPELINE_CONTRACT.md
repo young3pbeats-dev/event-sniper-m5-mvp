@@ -22,3 +22,4 @@ process_event(payload) → dict | None
 - No UI logic in pipeline
 - No retries
 - Idempotent per duplicate events
+- 
