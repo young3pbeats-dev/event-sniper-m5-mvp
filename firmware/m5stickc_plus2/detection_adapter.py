@@ -89,22 +89,24 @@ def detect(raw_text: str) -> Dict[str, Any]:
         return _safe_fallback(source="missing_api_key")
 
     try:
-        response = requests.post(
-            ANTHROPIC_API_URL,
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {api_key}",
-                "anthropic-version": "2023-06-01"
-            },
-            json={
-                "model": "claude-sonnet-4-20250514",
-                "max_tokens": 800,
-                "system": DETECTION_SYSTEM_PROMPT,
-                "messages": [{"role": "user", "content": raw_text}]
-            },
-            timeout=20
-        )
+      response = requests.post(
+    OPENAI_API_URL,
+    headers={
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {api_key}",
+    },
+    json={
+        "model": "gpt-4.1-mini",
+        "messages": [
+            {"role": "system", "content": DETECTION_SYSTEM_PROMPT},
+            {"role": "user", "content": raw_text}
+        ],
+        "temperature": 0,
+    },
+    timeout=20
+)
 
+    
         response.raise_for_status()
         data = response.json()
 
