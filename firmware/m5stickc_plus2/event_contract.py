@@ -122,6 +122,31 @@ def reset_state() -> None:
     global _last_accepted_event
     _last_accepted_event = None
 
+def normalize_event(event: Dict[str, Any]) -> Dict[str, Any]:
+    event = event.copy()
+
+    # Normalize confidence
+    if "confidence" in event:
+        event["confidence"] = event["confidence"].upper()
+
+    # Normalize source
+    SOURCE_MAP = {
+        "TRUMP": "POLITICAL_STATEMENT",
+        "TRUMP_SOCIAL": "POLITICAL_STATEMENT",
+        "NEWS": "GLOBAL_NEWS",
+        "GLOBAL": "GLOBAL_NEWS"
+    }
+    if "source" in event:
+        event["source"] = SOURCE_MAP.get(
+            event["source"].upper(),
+            event["source"].upper()
+        )
+
+    # Normalize entities
+    if "entities" in event and isinstance(event["entities"], list):
+        event["entities"] = [e.upper() for e in event["entities"]]
+
+    return event
 
 def process_event(event_payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """
@@ -166,7 +191,7 @@ def process_raw_text(raw_text: str) -> Optional[Dict[str, Any]]:
         if not isinstance(detection_result, dict):
             return None
 
-        return process_event(detection_result)
+     return process_event(normalize_event(detection_result))
 
     except ImportError as e:
         print("IMPORT ERROR:", e)
