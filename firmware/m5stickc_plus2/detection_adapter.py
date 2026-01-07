@@ -57,7 +57,7 @@ FORBIDDEN:
 """
 
 
-ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages"
+OPENAI_API_URL = "https://api.openai.com/v1/chat/completions"
 
 
 def _safe_fallback(source: str = "fallback") -> Dict[str, Any]:
