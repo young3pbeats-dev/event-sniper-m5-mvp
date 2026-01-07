@@ -76,5 +76,19 @@ def detect(raw_text: str) -> dict:
     content = response.json()["choices"][0]["message"]["content"]
     result = json.loads(content)
 
+if "trump" in raw_text.lower():
+    result["source"] = "TRUMP_STATEMENT"
+  
+  ALLOWED_SOURCES = {
+    "TRUMP_STATEMENT",
+    "GLOBAL_NEWS",
+    "GEOPOLITICS",
+    "OFFICIAL_RELEASE",
+}
+
+if result.get("source") not in ALLOWED_SOURCES:
+    raise RuntimeError(f"INVALID SOURCE FROM MODEL: {result.get('source')}")
+
+
     result["timestamp"] = datetime.now(timezone.utc).isoformat()
     return result
