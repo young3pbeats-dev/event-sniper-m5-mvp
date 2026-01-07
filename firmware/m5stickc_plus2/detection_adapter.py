@@ -85,11 +85,12 @@ def detect(raw_text: str) -> Dict[str, Any]:
         return _safe_fallback(source="empty_input")
 
     api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        return _safe_fallback(source="missing_api_key")
+if not api_key:
+    return _safe_fallback(source="missing_api_key")
 
-       try:
-        response = requests.post(
+try:
+    response = requests.post(
+
             OPENAI_API_URL,
             headers={
                 "Content-Type": "application/json",
