@@ -88,32 +88,34 @@ def detect(raw_text: str) -> Dict[str, Any]:
     if not api_key:
         return _safe_fallback(source="missing_api_key")
 
-    try:
-      response = requests.post(
-    OPENAI_API_URL,
-    headers={
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {api_key}",
-    },
-    json={
-        "model": "gpt-4.1-mini",
-        "messages": [
-            {"role": "system", "content": DETECTION_SYSTEM_PROMPT},
-            {"role": "user", "content": raw_text}
-        ],
-        "temperature": 0,
-    },
-    timeout=20
-)
+       try:
+        response = requests.post(
+            OPENAI_API_URL,
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {api_key}",
+            },
+            json={
+                "model": "gpt-4.1-mini",
+                "messages": [
+                    {"role": "system", "content": DETECTION_SYSTEM_PROMPT},
+                    {"role": "user", "content": raw_text}
+                ],
+                "temperature": 0,
+            },
+            timeout=20
+        )
 
-    
         response.raise_for_status()
         data = response.json()
 
-       raw_output = data["choices"][0]["message"]["content"].strip()
-result = json.loads(raw_output)
-return result
+        raw_output = data["choices"][0]["message"]["content"].strip()
 
+        # HARD GUARD: deve essere JSON valido
+        result = json.loads(raw_output)
 
-    except Exception:
+        return result
+
+    except Exception as e:
         return _safe_fallback(source="llm_error")
+
