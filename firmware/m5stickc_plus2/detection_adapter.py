@@ -118,7 +118,8 @@ def detect(raw_text: str) -> Dict[str, Any]:
         response.raise_for_status()
         data = response.json()
 
-        raw_output = data["choices"][0]["message"]["content"].strip()
+        raw_output = data["output_text"]
+.strip()
 
         # HARD GUARD: deve essere JSON valido
         result = json.loads(raw_output)
