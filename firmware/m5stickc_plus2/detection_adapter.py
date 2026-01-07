@@ -110,18 +110,10 @@ def detect(raw_text: str) -> Dict[str, Any]:
         response.raise_for_status()
         data = response.json()
 
-        # Concatenate all text blocks
-        text_blocks = [
-            block.get("text", "")
-            for block in data.get("content", [])
-            if block.get("type") == "text"
-        ]
+       raw_output = data["choices"][0]["message"]["content"].strip()
+result = json.loads(raw_output)
+return result
 
-        raw_output = "".join(text_blocks).strip()
-
-        result = json.loads(raw_output)
-
-        return result
 
     except Exception:
         return _safe_fallback(source="llm_error")
