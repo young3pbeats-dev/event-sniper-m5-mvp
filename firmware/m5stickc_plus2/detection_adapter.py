@@ -44,13 +44,18 @@ JSON schema:
 }
 """
 
+ALLOWED_SOURCES = {
+    "TRUMP_STATEMENT",
+    "GLOBAL_NEWS",
+    "GEOPOLITICS",
+    "OFFICIAL_RELEASE",
+}
 
 def detect(raw_text: str) -> dict:
     api_key = os.environ.get("OPENAI_API_KEY")
 
-    # HARD GUARD — niente fallback silenziosi
     if not api_key or not api_key.startswith("sk-"):
-        raise RuntimeError("OPENAI_API_KEY NOT LOADED INSIDE detection_adapter")
+        raise RuntimeError("OPENAI_API_KEY NOT LOADED")
 
     response = requests.post(
         OPENAI_API_URL,
@@ -71,24 +76,16 @@ def detect(raw_text: str) -> dict:
     )
 
     if response.status_code != 200:
-        raise RuntimeError(f"OPENAI HTTP ERROR {response.status_code}: {response.text}")
+        raise RuntimeError(f"OPENAI ERROR {response.status_code}: {response.text}")
 
-    content = response.json()["choices"][0]["message"]["content"]
-    result = json.loads(content)
+    result = json.loads(response.json()["choices"][0]["message"]["content"])
 
-if "trump" in raw_text.lower():
-    result["source"] = "TRUMP_STATEMENT"
-  
-  ALLOWED_SOURCES = {
-    "TRUMP_STATEMENT",
-    "GLOBAL_NEWS",
-    "GEOPOLITICS",
-    "OFFICIAL_RELEASE",
-}
+    # Hard override Trump
+    if "trump" in raw_text.lower():
+        result["source"] = "TRUMP_STATEMENT"
 
-if result.get("source") not in ALLOWED_SOURCES:
-    raise RuntimeError(f"INVALID SOURCE FROM MODEL: {result.get('source')}")
-
+    if result.get("source") not in ALLOWED_SOURCES:
+        raise RuntimeError(f"INVALID SOURCE: {result.get('source')}")
 
     result["timestamp"] = datetime.now(timezone.utc).isoformat()
     return result
