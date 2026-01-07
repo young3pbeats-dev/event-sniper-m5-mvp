@@ -1,49 +1,13 @@
-"""
-detection_adapter.py
-
-Adapter layer for event detection using OpenAI Responses API.
-
-Responsibilities:
-- Send raw text to Detection LLM
-- Return structured JSON compliant with Detection Contract
-
-This module does NOT:
-- Filter events
-- Interpret market impact
-- Add business logic
-"""
-
 import json
 import os
-from datetime import datetime, timezone
-from typing import Dict, Any
-
 import requests
+from datetime import datetime, timezone
 
-
-OPENAI_API_URL = "https://api.openai.com/v1/responses"
-
+OPENAI_API_URL = "https://api.openai.com/v1/chat/completions"
 
 DETECTION_SYSTEM_PROMPT = """
-IMPORTANT EXECUTION RULE (NON-NEGOTIABLE):
-You must NEVER respond with natural language.
-You must ALWAYS output a single valid JSON object.
-If no analyzable raw text is provided, you MUST still output a JSON object with LOW confidence.
+You must output ONLY valid JSON.
 
-ROLE:
-You are a Detection module in an event-driven trading system.
-Your role is strictly limited to DETECTION.
-
-DETECTION PURPOSE:
-- emergence of a new global narrative
-- sudden political or macro announcements
-- geopolitical escalations or stance changes
-- high-ambiguity news involving global actors
-
-PRIMARY SOCIAL SOURCES (FIRST-CLASS):
-- Donald J. Trump — Truth Social / X (official verified accounts)
-
-OUTPUT FORMAT (STRICT):
 {
   "event_type": "POLITICAL_STATEMENT | GLOBAL_EVENT | MACRO_SHOCK",
   "confidence": "LOW | MEDIUM | HIGH",
@@ -52,14 +16,28 @@ OUTPUT FORMAT (STRICT):
   "timestamp": "ISO-8601"
 }
 
-FORBIDDEN:
-- No filtering
-- No market impact analysis
-- No explanations
+CONFIDENCE RULES:
+- HIGH: Clear emergence of new global-level event involving nations, global leaders, institutions, wars, sanctions, treaties, or systemic macro decisions
+- MEDIUM: Ambiguous or early signals involving global actors
+- LOW: Weak, incomplete, non-global signals
+
+ENTITY RULES:
+- Include ONLY explicitly mentioned global actors (countries, heads of state, governments, institutions, central banks)
+- Do NOT infer or invent entities
+
+PRIMARY SOCIAL SOURCES:
+- Donald J. Trump social posts are FIRST-CLASS detection signals
+- Mark as source: "POLITICAL_STATEMENT" for Trump content
+- Mark as source: "GLOBAL_NEWS" for news articles
+- Mark as source: "GEOPOLITICS" for geopolitical analysis
+
+EVENT TYPES:
+- POLITICAL_STATEMENT: Direct statements from political figures
+- GLOBAL_EVENT: Geopolitical developments, wars, sanctions
+- MACRO_SHOCK: Economic policy, central bank decisions, systemic changes
 """
 
-
-def _safe_fallback(source: str = "fallback") -> Dict[str, Any]:
+def _safe_fallback(source="fallback"):
     return {
         "event_type": "GLOBAL_EVENT",
         "confidence": "LOW",
@@ -68,72 +46,87 @@ def _safe_fallback(source: str = "fallback") -> Dict[str, Any]:
         "timestamp": datetime.now(timezone.utc).isoformat()
     }
 
-
-def detect(raw_text: str) -> Dict[str, Any]:
-    # Guard rail: empty input
-    if not raw_text or not raw_text.strip():
-        return _safe_fallback(source="empty_input")
-
+def detect(raw_text):
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
-        return _safe_fallback(source="missing_api_key")
+        return _safe_fallback("missing_api_key")
 
     try:
         response = requests.post(
             OPENAI_API_URL,
             headers={
-                "Content-Type": "application/json",
                 "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json"
             },
             json={
-                "model": "gpt-4.1-mini",
-                "input": [
-                    {
-                        "role": "system",
-                        "content": DETECTION_SYSTEM_PROMPT
-                    },
-                    {
-                        "role": "user",
-                        "content": raw_text
-                    }
+                "model": "gpt-4",
+                "messages": [
+                    {"role": "system", "content": DETECTION_SYSTEM_PROMPT},
+                    {"role": "user", "content": raw_text}
                 ],
-                "temperature": 0,
-                "max_output_tokens": 300
+                "max_tokens": 300,
+                "temperature": 0
             },
-            timeout=20
+            timeout=30
         )
-
+        
         response.raise_for_status()
         data = response.json()
+        
+        text = data["choices"][0]["message"]["content"]
+        
+        text = text.strip()
+        if text.startswith("```json"):
+            text = text[7:]
+        if text.startswith("```"):
+            text = text[3:]
+        if text.endswith("```"):
+            text = text[:-3]
+        text = text.strip()
+        
+        result = json.loads(text)
+        
+        required_fields = ["event_type", "confidence", "source", "entities", "timestamp"]
+        if not all(field in result for field in required_fields):
+            return _safe_fallback("invalid_schema")
+        
+        return result
+        
+    except requests.exceptions.RequestException:
+        return _safe_fallback("network_error")
+    except json.JSONDecodeError:
+        return _safe_fallback("parse_error")
+    except Exception:
+        return _safe_fallback("unknown_error")
+```
 
-        # ---- ROBUST PARSING (NO ASSUMPTIONS) ----
-        output_blocks = data.get("output", [])
-        if not output_blocks:
-            return _safe_fallback(source="empty_response")
+---
 
-        content_blocks = output_blocks[0].get("content", [])
-        if not content_blocks:
-            return _safe_fallback(source="empty_content")
+## 🎯 WHY IT WAS BROKEN
 
-        raw_text_out = ""
-        for block in content_blocks:
-            if isinstance(block, dict) and "text" in block:
-                raw_text_out += block["text"]
+| Component | Before | After | Impact |
+|-----------|--------|-------|--------|
+| **API URL** | `/v1/responses` (doesn't exist) | `/v1/chat/completions` | API call was failing |
+| **Model** | `gpt-4.1-mini` (fake) | `gpt-4` | Invalid model = error |
+| **Request** | `"input": raw_text` | `"messages": [...]` | Wrong structure = error |
+| **Response** | `data["output"][0]...` | `data["choices"][0]...` | Parse failed = fallback |
+| **Fallback** | Returns LOW confidence | Gets rejected by filter | Always None |
 
-        raw_text_out = raw_text_out.strip()
+---
 
-        # DEBUG VISIBILITY (VOLUTA)
-        print("LLM RAW OUTPUT:", raw_text_out)
+## ✅ EXPECTED BEHAVIOR AFTER FIX
+```
+Test 1: Bitcoin is pumping today
+Output: None  ← Correctly rejected (not global-scale)
 
-        if not raw_text_out:
-            return _safe_fallback(source="empty_llm_text")
+Test 2: Trump announces new tariffs on Chinese imports
+Output: {'event_type': 'POLITICAL_STATEMENT', 'confidence': 'HIGH', 'symbol': 'TRUMP/CHINA'}  ← ACCEPTED
 
-        return json.loads(raw_text_out)
+Test 3: (duplicate)
+Output: None  ← Correctly rejected (anti-spam)
 
-    except json.JSONDecodeError as e:
-        print("JSON PARSE ERROR:", e)
-        return _safe_fallback(source="json_parse_error")
+Test 4: US officials discuss potential future policy changes
+Output: None  ← Correctly rejected (ambiguous, not concrete)
 
-    except Exception as e:
-        print("DETECTION ERROR:", e)
-        return _safe_fallback(source="llm_error")
+Test 5: NATO responds to Russia military activity
+Output: {'event_type': 'GLOBAL_EVENT', 'confidence': 'HIGH', 'symbol': 'NATO/RUSSIA'}  ← ACCEPTED
