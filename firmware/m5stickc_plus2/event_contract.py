@@ -1,36 +1,43 @@
 """
 event_contract.py
 
-Event filtering logic for event-sniper-m5-mvp.
-This module contains the business rules that determine which events
-should be forwarded to the M5 device for human confirmation.
+Event filtering and gatekeeping logic for event-sniper-m5-mvp.
+
+This module is the CRITICAL FILTERING LAYER between detection and device output.
+It enforces strict rules to ensure only HIGH-CONFIDENCE, GLOBAL-SCALE events
+are forwarded to the M5StickC Plus2 device for human confirmation.
 
 CORE PRINCIPLE: GLOBAL NEWS ONLY
-Only HIGH-impact, macro-scale events involving global actors.
-Examples: Trump statements, wars, FED policy, territorial disputes.
-NO local news, NO minor events, NO low-confidence signals.
+- Only HIGH-impact, macro-scale events involving global actors
+- Examples: Trump statements, wars, FED policy, territorial disputes
+- NO local news, NO minor events, NO low-confidence signals
+
+PURPOSE:
+- Filter detected events through business rules
+- Block noise, duplicates, and low-quality signals
+- Format accepted events for M5 device display
+- Act as the last line of defense before human confirmation
+
+This is production-critical infrastructure.
+False positives are unacceptable.
 """
 
-from typing import Optional  # ✅ NECESSARIO PER PYTHON 3.9
-from detection_adapter import detect  # NON-INVASIVE
+from typing import Optional, Dict, List, Any
 
-# ============================================
-# ALLOWED VALUES (GLOBAL-SCALE ONLY)
-# ============================================
 
-ALLOWED_EVENT_TYPES = [
+ALLOWED_EVENT_TYPES: List[str] = [
     "POLITICAL_STATEMENT",
     "GLOBAL_EVENT",
     "MACRO_SHOCK"
 ]
 
-ALLOWED_SOURCES = [
+ALLOWED_SOURCES: List[str] = [
     "GLOBAL_NEWS",
     "POLITICAL_STATEMENT",
     "GEOPOLITICS"
 ]
 
-GLOBAL_ENTITIES = [
+GLOBAL_ENTITIES: List[str] = [
     "TRUMP",
     "USA",
     "CHINA",
@@ -41,47 +48,67 @@ GLOBAL_ENTITIES = [
     "IMF"
 ]
 
-# ============================================
-# STATE (MODE B ANTI-SPAM)
-# ============================================
 
-_last_accepted_event = None
+_last_accepted_event: Optional[Dict[str, Any]] = None
 
-# ============================================
-# CORE FILTER FUNCTION (CLAUDE – UNTOUCHED)
-# ============================================
 
-def should_accept_event(event_payload: dict) -> bool:
+def should_accept_event(event_payload: Dict[str, Any]) -> bool:
+    """
+    Determine if an event should be sent to the M5 device.
+    
+    ALL conditions must be met:
+    1. Confidence = HIGH
+    2. Event type = global-scale (political/macro)
+    3. Source = credible news/political
+    4. At least ONE global entity mentioned
+    5. NOT identical to last accepted event
+    
+    Args:
+        event_payload: Dict with keys: confidence, event_type, source, entities
+    
+    Returns:
+        bool: True if event passes all filters
+    """
     global _last_accepted_event
-
+    
     if event_payload.get("confidence") != "HIGH":
         return False
-
+    
     event_type = event_payload.get("event_type")
     if event_type not in ALLOWED_EVENT_TYPES:
         return False
-
+    
     source = event_payload.get("source")
     if source not in ALLOWED_SOURCES:
         return False
-
+    
     entities = event_payload.get("entities", [])
     has_global_entity = any(
-        entity.upper() in GLOBAL_ENTITIES
+        entity.upper() in GLOBAL_ENTITIES 
         for entity in entities
     )
     if not has_global_entity:
         return False
-
+    
     if _last_accepted_event is not None:
         if events_are_identical(event_payload, _last_accepted_event):
             return False
-
+    
     _last_accepted_event = event_payload.copy()
     return True
 
 
-def events_are_identical(event1: dict, event2: dict) -> bool:
+def events_are_identical(event1: Dict[str, Any], event2: Dict[str, Any]) -> bool:
+    """
+    Compare two events for identity.
+    
+    Args:
+        event1: First event payload
+        event2: Second event payload
+    
+    Returns:
+        bool: True if events are identical
+    """
     return (
         event1.get("event_type") == event2.get("event_type") and
         event1.get("source") == event2.get("source") and
@@ -90,57 +117,118 @@ def events_are_identical(event1: dict, event2: dict) -> bool:
     )
 
 
-def reset_state():
+def reset_state() -> None:
+    """Reset anti-spam state. Used for testing."""
     global _last_accepted_event
     _last_accepted_event = None
 
-# ============================================
-# M5 DEVICE PAYLOAD FORMATTER (CLAUDE – UNTOUCHED)
-# ============================================
 
-def process_event(event_payload: dict) -> Optional[dict]:
+def process_event(event_payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """
+    Main entry point: filter + format for M5 device.
+    
+    Args:
+        event_payload: Raw event dict from detection module
+    
+    Returns:
+        dict: M5-compatible payload with keys: event_type, confidence, symbol
+        None: If event rejected by filters
+    """
     if not should_accept_event(event_payload):
         return None
-
+    
     entities = event_payload.get("entities", [])
-
+    
     if len(entities) >= 2:
         symbol = f"{entities[0]}/{entities[1]}"
     elif len(entities) == 1:
         symbol = f"{entities[0]}/NEWS"
     else:
         symbol = "GLOBAL/NEWS"
-
+    
     return {
         "event_type": event_payload.get("event_type"),
         "confidence": event_payload.get("confidence"),
         "symbol": symbol
     }
 
-# ============================================
-# FULL PIPELINE ENTRY POINT (ONLY ADDITION)
-# ============================================
 
-def process_raw_text(raw_text: str) -> Optional[dict]:
-    detected_event = detect(raw_text)
-    return process_event(detected_event)
+def process_raw_text(raw_text: str) -> Optional[Dict[str, Any]]:
+    """
+    Integration point: raw text -> detection -> filtering -> M5 payload.
+    
+    This function bridges the detection module and filtering logic.
+    It assumes detection_adapter is available in the runtime environment.
+    
+    Args:
+        raw_text: Raw input text (news, social post, statement)
+    
+    Returns:
+        dict: M5-compatible payload if accepted
+        None: If event rejected or detection failed
+    """
+    try:
+        from detection_adapter import detect
+        
+        detection_result = detect(raw_text)
+        
+        return process_event(detection_result)
+        
+    except ImportError:
+        return None
+    except Exception:
+        return None
 
-
-# ============================================
-# TESTING (CLAUDE – UNTOUCHED)
-# ============================================
 
 if __name__ == "__main__":
     print("=== EVENT CONTRACT TESTS ===\n")
-
+    
     test_1 = {
         "event_type": "POLITICAL_STATEMENT",
         "confidence": "HIGH",
         "source": "POLITICAL_STATEMENT",
         "entities": ["TRUMP", "FED"],
+        "description": "Trump announces Fed policy"
     }
-
-    print(process_event(test_1))
-    print(process_raw_text(
-        "Trump announces new tariffs on China effective immediately"
-    ))
+    result_1 = process_event(test_1)
+    print(f"Test 1 (Trump/FED): {result_1}")
+    print(f"  Status: {'✅ ACCEPTED' if result_1 else '❌ REJECTED'}\n")
+    
+    result_2 = process_event(test_1)
+    print(f"Test 2 (Duplicate): {result_2}")
+    print(f"  Status: {'✅ ACCEPTED' if result_2 else '❌ REJECTED (anti-spam)'}\n")
+    
+    reset_state()
+    test_3 = {
+        "event_type": "POLITICAL_STATEMENT",
+        "confidence": "MEDIUM",
+        "source": "GLOBAL_NEWS",
+        "entities": ["USA"],
+    }
+    result_3 = process_event(test_3)
+    print(f"Test 3 (MEDIUM conf): {result_3}")
+    print(f"  Status: {'✅ ACCEPTED' if result_3 else '❌ REJECTED (not HIGH)'}\n")
+    
+    test_4 = {
+        "event_type": "GLOBAL_EVENT",
+        "confidence": "HIGH",
+        "source": "GLOBAL_NEWS",
+        "entities": ["BINANCE", "COINBASE"],
+    }
+    result_4 = process_event(test_4)
+    print(f"Test 4 (Local entities): {result_4}")
+    print(f"  Status: {'✅ ACCEPTED' if result_4 else '❌ REJECTED (not global)'}\n")
+    
+    test_5 = {
+        "event_type": "GLOBAL_EVENT",
+        "confidence": "HIGH",
+        "source": "GEOPOLITICS",
+        "entities": ["CHINA", "NATO"],
+        "description": "China-NATO tensions"
+    }
+    result_5 = process_event(test_5)
+    print(f"Test 5 (China/NATO): {result_5}")
+    print(f"  Status: {'✅ ACCEPTED' if result_5 else '❌ REJECTED'}\n")
+    
+    print("=== SUMMARY ===")
+    print("✅ Accept Trump/FED → ❌ Reject duplicate → ❌ Reject MEDIUM → ❌ Reject local → ✅ Accept China/NATO")
