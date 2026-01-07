@@ -11,7 +11,8 @@ Examples: Trump statements, wars, FED policy, territorial disputes.
 NO local news, NO minor events, NO low-confidence signals.
 """
 
-from detection_adapter import detect  # <-- ADDED (non-invasive)
+from typing import Optional  # ✅ NECESSARIO PER PYTHON 3.9
+from detection_adapter import detect  # NON-INVASIVE
 
 # ============================================
 # ALLOWED VALUES (GLOBAL-SCALE ONLY)
@@ -46,22 +47,11 @@ GLOBAL_ENTITIES = [
 
 _last_accepted_event = None
 
-
 # ============================================
 # CORE FILTER FUNCTION (CLAUDE – UNTOUCHED)
 # ============================================
 
 def should_accept_event(event_payload: dict) -> bool:
-    """
-    Determine if an event should be sent to the M5 device.
-    
-    ALL conditions must be met:
-    1. Confidence = HIGH
-    2. Event type = global-scale (political/macro)
-    3. Source = credible news/political
-    4. At least ONE global entity mentioned
-    5. NOT identical to last accepted event
-    """
     global _last_accepted_event
 
     if event_payload.get("confidence") != "HIGH":
@@ -104,15 +94,11 @@ def reset_state():
     global _last_accepted_event
     _last_accepted_event = None
 
-
 # ============================================
 # M5 DEVICE PAYLOAD FORMATTER (CLAUDE – UNTOUCHED)
 # ============================================
 
-def process_event(event_payload: dict) -> dict | None:
-    """
-    Filter + format event for M5 device.
-    """
+def process_event(event_payload: dict) -> Optional[dict]:
     if not should_accept_event(event_payload):
         return None
 
@@ -131,16 +117,11 @@ def process_event(event_payload: dict) -> dict | None:
         "symbol": symbol
     }
 
-
 # ============================================
 # FULL PIPELINE ENTRY POINT (ONLY ADDITION)
 # ============================================
 
-def process_raw_text(raw_text: str) -> dict | None:
-    """
-    Full pipeline entry point:
-    raw text → detection → filtering → M5 payload
-    """
+def process_raw_text(raw_text: str) -> Optional[dict]:
     detected_event = detect(raw_text)
     return process_event(detected_event)
 
@@ -158,8 +139,8 @@ if __name__ == "__main__":
         "source": "POLITICAL_STATEMENT",
         "entities": ["TRUMP", "FED"],
     }
-    print(process_event(test_1))
 
+    print(process_event(test_1))
     print(process_raw_text(
         "Trump announces new tariffs on China effective immediately"
     ))
