@@ -84,7 +84,7 @@ def detect(raw_text: str) -> Dict[str, Any]:
     if not raw_text or not raw_text.strip():
         return _safe_fallback(source="empty_input")
 
-    api_key = os.getenv("ANTHROPIC_API_KEY")
+    api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         return _safe_fallback(source="missing_api_key")
 
