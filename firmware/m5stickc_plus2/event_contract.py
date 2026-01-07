@@ -191,7 +191,8 @@ def process_raw_text(raw_text: str) -> Optional[Dict[str, Any]]:
         if not isinstance(detection_result, dict):
             return None
 
-     return process_event(normalize_event(detection_result))
+        normalized = normalize_event(detection_result)
+        return process_event(normalized)
 
     except ImportError as e:
         print("IMPORT ERROR:", e)
@@ -200,7 +201,6 @@ def process_raw_text(raw_text: str) -> Optional[Dict[str, Any]]:
     except Exception as e:
         print("PIPELINE ERROR:", e)
         return None
-
 
 
 if __name__ == "__main__":
