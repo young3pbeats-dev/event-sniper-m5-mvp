@@ -170,10 +170,10 @@ def process_raw_text(raw_text: str) -> Optional[Dict[str, Any]]:
     try:
         from detection_adapter import detect
         
-        detection_result = detect(raw_text)
-        
-        return process_event(detection_result)
-        
+    detection_result = detect(raw_text)
+print("DETECTION RAW:", detection_result)
+return process_event(detection_result)
+
     except ImportError:
         return None
     except Exception:
