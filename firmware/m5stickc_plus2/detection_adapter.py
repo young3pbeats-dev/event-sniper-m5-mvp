@@ -1,3 +1,7 @@
+# HARD RULE:
+# OpenAI Responses API is the ONLY supported detection backend.
+# Claude / Anthropic is explicitly unsupported.
+
 import json
 import os
 import requests
@@ -52,12 +56,12 @@ def detect(raw_text):
         return _safe_fallback("missing_api_key")
 
     try:
-        response = requests.post(
-            OPENAI_API_URL,
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json"
-            },
+      response = requests.post(
+    OPENAI_API_URL,
+    headers={
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {api_key}",
+    },
             json={
                 "model": "gpt-4",
                 "messages": [
@@ -67,8 +71,13 @@ def detect(raw_text):
                 "max_tokens": 300,
                 "temperature": 0
             },
-            timeout=30
+            timeout=20
         )
+      
+      if response.status_code != 200:
+    print("OPENAI STATUS:", response.status_code)
+    print("OPENAI ERROR:", response.text)
+    return _safe_fallback(source="openai_http_error")
         
         response.raise_for_status()
         data = response.json()
