@@ -70,16 +70,6 @@ def _safe_fallback(source: str = "fallback") -> Dict[str, Any]:
 
 
 def detect(raw_text: str) -> Dict[str, Any]:
-    """
-    Perform event detection on raw text using OpenAI.
-
-    Args:
-        raw_text (str): Unstructured input text
-
-    Returns:
-        dict: Detection Contract compliant JSON
-    """
-
     if not raw_text or not raw_text.strip():
         return _safe_fallback(source="empty_input")
 
@@ -94,23 +84,20 @@ def detect(raw_text: str) -> Dict[str, Any]:
                 "Content-Type": "application/json",
                 "Authorization": f"Bearer {api_key}",
             },
-           json={
-  "model": "gpt-4.1-mini",
-  "input": [
-    {
-      "role": "system",
-      "content": DETECTION_SYSTEM_PROMPT
-    },
-    {
-      "role": "user",
-      "content": raw_text
-    }
-  ]
-}
-
+            json={
+                "model": "gpt-4.1-mini",
+                "input": [
+                    {
+                        "role": "system",
+                        "content": DETECTION_SYSTEM_PROMPT
+                    },
+                    {
+                        "role": "user",
+                        "content": raw_text
+                    }
                 ],
                 "temperature": 0,
-                "max_tokens": 400,
+                "max_output_tokens": 300
             },
             timeout=20
         )
@@ -118,13 +105,20 @@ def detect(raw_text: str) -> Dict[str, Any]:
         response.raise_for_status()
         data = response.json()
 
-        raw_output = data["output_text"]
-.strip()
+        # Estrazione CORRETTA testo dalla Responses API
+        output_blocks = data.get("output", [])
+        if not output_blocks:
+            return _safe_fallback(source="empty_response")
 
-        # HARD GUARD: deve essere JSON valido
-        result = json.loads(raw_output)
+        content_blocks = output_blocks[0].get("content", [])
+        text = "".join(
+            block.get("text", "")
+            for block in content_blocks
+            if block.get("type") == "output_text"
+        ).strip()
 
-        return result
+        return json.loads(text)
 
-    except Exception:
+    except Exception as e:
+        print("DETECTION ERROR:", e)
         return _safe_fallback(source="llm_error")
