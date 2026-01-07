@@ -1,7 +1,7 @@
 """
 detection_adapter.py
 
-Adapter layer for event detection using OpenAI API.
+Adapter layer for event detection using OpenAI Responses API.
 
 Responsibilities:
 - Send raw text to Detection LLM
@@ -70,6 +70,7 @@ def _safe_fallback(source: str = "fallback") -> Dict[str, Any]:
 
 
 def detect(raw_text: str) -> Dict[str, Any]:
+    # Guard rail: empty input
     if not raw_text or not raw_text.strip():
         return _safe_fallback(source="empty_input")
 
@@ -105,19 +106,33 @@ def detect(raw_text: str) -> Dict[str, Any]:
         response.raise_for_status()
         data = response.json()
 
-        # Estrazione CORRETTA testo dalla Responses API
+        # ---- ROBUST PARSING (NO ASSUMPTIONS) ----
         output_blocks = data.get("output", [])
         if not output_blocks:
             return _safe_fallback(source="empty_response")
 
         content_blocks = output_blocks[0].get("content", [])
-        text = "".join(
-            block.get("text", "")
-            for block in content_blocks
-            if block.get("type") == "output_text"
-        ).strip()
+        if not content_blocks:
+            return _safe_fallback(source="empty_content")
 
-        return json.loads(text)
+        raw_text_out = ""
+        for block in content_blocks:
+            if isinstance(block, dict) and "text" in block:
+                raw_text_out += block["text"]
+
+        raw_text_out = raw_text_out.strip()
+
+        # DEBUG VISIBILITY (VOLUTA)
+        print("LLM RAW OUTPUT:", raw_text_out)
+
+        if not raw_text_out:
+            return _safe_fallback(source="empty_llm_text")
+
+        return json.loads(raw_text_out)
+
+    except json.JSONDecodeError as e:
+        print("JSON PARSE ERROR:", e)
+        return _safe_fallback(source="json_parse_error")
 
     except Exception as e:
         print("DETECTION ERROR:", e)
