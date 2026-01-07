@@ -34,3 +34,15 @@ if __name__ == "__main__":
         result = process_raw_text(text)
         print("Output:", result)
         print("-" * 40)
+
+print("\n=== FORCED EVENT TEST ===")
+
+forced_event = {
+    "event_type": "POLITICAL_STATEMENT",
+    "confidence": "HIGH",
+    "source": "POLITICAL_STATEMENT",
+    "entities": ["TRUMP", "CHINA"]
+}
+
+from event_contract import process_event
+print(process_event(forced_event))
