@@ -155,29 +155,27 @@ def process_event(event_payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
 
 def process_raw_text(raw_text: str) -> Optional[Dict[str, Any]]:
     """
-    Integration point: raw text -> detection -> filtering -> M5 payload.
-    
-    This function bridges the detection module and filtering logic.
-    It assumes detection_adapter is available in the runtime environment.
-    
-    Args:
-        raw_text: Raw input text (news, social post, statement)
-    
-    Returns:
-        dict: M5-compatible payload if accepted
-        None: If event rejected or detection failed
+    raw text → detection → filtering → M5 payload
     """
     try:
         from detection_adapter import detect
-        
-    detection_result = detect(raw_text)
-print("DETECTION RAW:", detection_result)
-return process_event(detection_result)
 
-    except ImportError:
+        detection_result = detect(raw_text)
+        print("DETECTION RAW:", detection_result)
+
+        if not isinstance(detection_result, dict):
+            return None
+
+        return process_event(detection_result)
+
+    except ImportError as e:
+        print("IMPORT ERROR:", e)
         return None
-    except Exception:
+
+    except Exception as e:
+        print("PIPELINE ERROR:", e)
         return None
+
 
 
 if __name__ == "__main__":
