@@ -1,8 +1,7 @@
 """
 detection_adapter.py
 
-Adapter layer for event detection using an LLM.
-Exposes a single function: detect(raw_text: str) -> dict
+Adapter layer for event detection using OpenAI API.
 
 Responsibilities:
 - Send raw text to Detection LLM
@@ -20,6 +19,9 @@ from datetime import datetime, timezone
 from typing import Dict, Any
 
 import requests
+
+
+OPENAI_API_URL = "https://api.openai.com/v1/chat/completions"
 
 
 DETECTION_SYSTEM_PROMPT = """
@@ -57,9 +59,6 @@ FORBIDDEN:
 """
 
 
-OPENAI_API_URL = "https://api.openai.com/v1/chat/completions"
-
-
 def _safe_fallback(source: str = "fallback") -> Dict[str, Any]:
     return {
         "event_type": "GLOBAL_EVENT",
@@ -72,7 +71,7 @@ def _safe_fallback(source: str = "fallback") -> Dict[str, Any]:
 
 def detect(raw_text: str) -> Dict[str, Any]:
     """
-    Perform event detection on raw text using an LLM.
+    Perform event detection on raw text using OpenAI.
 
     Args:
         raw_text (str): Unstructured input text
@@ -85,24 +84,25 @@ def detect(raw_text: str) -> Dict[str, Any]:
         return _safe_fallback(source="empty_input")
 
     api_key = os.getenv("OPENAI_API_KEY")
-if not api_key:
-    return _safe_fallback(source="missing_api_key")
+    if not api_key:
+        return _safe_fallback(source="missing_api_key")
 
-try:
-    response = requests.post(
-
+    try:
+        response = requests.post(
             OPENAI_API_URL,
             headers={
                 "Content-Type": "application/json",
                 "Authorization": f"Bearer {api_key}",
             },
             json={
+                # MODELLO PIÙ ECONOMICO STABILE
                 "model": "gpt-4.1-mini",
                 "messages": [
                     {"role": "system", "content": DETECTION_SYSTEM_PROMPT},
                     {"role": "user", "content": raw_text}
                 ],
                 "temperature": 0,
+                "max_tokens": 400,
             },
             timeout=20
         )
@@ -117,6 +117,5 @@ try:
 
         return result
 
-    except Exception as e:
+    except Exception:
         return _safe_fallback(source="llm_error")
-
