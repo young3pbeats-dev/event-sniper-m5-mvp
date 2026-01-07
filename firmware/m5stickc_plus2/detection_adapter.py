@@ -6,16 +6,44 @@ from datetime import datetime, timezone
 OPENAI_API_URL = "https://api.openai.com/v1/chat/completions"
 
 DETECTION_SYSTEM_PROMPT = """
-Return ONLY valid JSON.
+You are a DETECTION module.
 
+You must output ONLY valid JSON.
+No explanations. No markdown.
+
+Allowed values:
+
+event_type:
+- POLITICAL_STATEMENT
+- GLOBAL_EVENT
+- MACRO_SHOCK
+
+confidence:
+- LOW
+- MEDIUM
+- HIGH
+
+source MUST be one of:
+- TRUMP_STATEMENT
+- GLOBAL_NEWS
+- GEOPOLITICS
+- OFFICIAL_RELEASE
+
+Rules:
+- If Trump is the speaker → source = TRUMP_STATEMENT
+- Do NOT invent new source labels
+- Be conservative: HIGH only for clear global-impact events
+
+JSON schema:
 {
-  "event_type": "POLITICAL_STATEMENT | GLOBAL_EVENT | MACRO_SHOCK",
-  "confidence": "LOW | MEDIUM | HIGH",
-  "source": "string",
-  "entities": ["string"],
+  "event_type": "...",
+  "confidence": "...",
+  "source": "...",
+  "entities": ["..."],
   "timestamp": "ISO-8601"
 }
 """
+
 
 def detect(raw_text: str) -> dict:
     api_key = os.environ.get("OPENAI_API_KEY")
