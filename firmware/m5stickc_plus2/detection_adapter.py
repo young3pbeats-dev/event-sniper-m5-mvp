@@ -21,7 +21,7 @@ from typing import Dict, Any
 import requests
 
 
-OPENAI_API_URL = "https://api.openai.com/v1/chat/completions"
+OPENAI_API_URL = "https://api.openai.com/v1/responses"
 
 
 DETECTION_SYSTEM_PROMPT = """
@@ -94,12 +94,20 @@ def detect(raw_text: str) -> Dict[str, Any]:
                 "Content-Type": "application/json",
                 "Authorization": f"Bearer {api_key}",
             },
-            json={
-                # MODELLO PIÙ ECONOMICO STABILE
-                "model": "gpt-4.1-mini",
-                "messages": [
-                    {"role": "system", "content": DETECTION_SYSTEM_PROMPT},
-                    {"role": "user", "content": raw_text}
+           json={
+  "model": "gpt-4.1-mini",
+  "input": [
+    {
+      "role": "system",
+      "content": DETECTION_SYSTEM_PROMPT
+    },
+    {
+      "role": "user",
+      "content": raw_text
+    }
+  ]
+}
+
                 ],
                 "temperature": 0,
                 "max_tokens": 400,
