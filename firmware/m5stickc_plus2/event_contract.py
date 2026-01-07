@@ -71,7 +71,7 @@ def should_accept_event(event_payload: Dict[str, Any]) -> bool:
     """
     global _last_accepted_event
     
-   if event_payload.get("confidence") not in ["HIGH", "MEDIUM"]:
+ if event_payload.get("confidence") == "LOW" and event_payload.get("source") != "POLITICAL_STATEMENT":
     return False
     
     event_type = event_payload.get("event_type")
