@@ -7,7 +7,6 @@ OPENAI_API_URL = "https://api.openai.com/v1/chat/completions"
 
 DETECTION_SYSTEM_PROMPT = """
 You are a DETECTION module.
-
 You must output ONLY valid JSON.
 No explanations. No markdown.
 
@@ -28,6 +27,13 @@ source MUST be one of:
 - GLOBAL_NEWS
 - GEOPOLITICS
 - OFFICIAL_RELEASE
+
+entities RULES (CRITICAL):
+- Extract ONLY global actors: countries, leaders, institutions
+- Valid examples: TRUMP, USA, CHINA, RUSSIA, EU, NATO, FED, IMF
+- Do NOT extract: tariffs, imports, policy, statements
+- If Trump is mentioned: ALWAYS include "Trump" in entities
+- If China/Chinese is mentioned: ALWAYS include "China" in entities
 
 Rules:
 - If Trump is the speaker → source = TRUMP_STATEMENT
