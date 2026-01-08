@@ -233,6 +233,7 @@ def process_raw_text(raw_text: str) -> Optional[Dict[str, Any]]:
         print("FINAL RESULT:", result)
         
         return result
+    return event
 
     except ImportError as e:
         print("IMPORT ERROR:", e)
@@ -241,8 +242,6 @@ def process_raw_text(raw_text: str) -> Optional[Dict[str, Any]]:
     except Exception as e:
         print("PIPELINE ERROR:", e)
         return None
-        
-return event
 
 if __name__ == "__main__":
     print("=== EVENT CONTRACT TESTS ===\n")
