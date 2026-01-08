@@ -54,48 +54,22 @@ _last_accepted_event: Optional[Dict[str, Any]] = None
 
 
 def should_accept_event(event_payload: Dict[str, Any]) -> bool:
-    """
-    Determine if an event should be sent to the M5 device.
-    
-    CONFIDENCE RULES:
-    - Trump social (POLITICAL_STATEMENT source): Accept LOW/MEDIUM/HIGH
-    - Other sources: ONLY HIGH confidence
-    
-    ALL other conditions must be met:
-    1. Event type = global-scale (political/macro)
-    2. Source = credible news/political
-    3. At least ONE global entity mentioned
-    4. NOT identical to last accepted event
-    
-    Args:
-        event_payload: Dict with keys: confidence, event_type, source, entities
-    
-    Returns:
-        bool: True if event passes all filters
-    """
     global _last_accepted_event
     
-    # RULE 1: Confidence check (Trump social bypass)
     confidence = event_payload.get("confidence")
     source = event_payload.get("source")
     
-    # If NOT from Trump social, require HIGH confidence
     if source != "POLITICAL_STATEMENT":
         if confidence != "HIGH":
             return False
-    # If from Trump social, accept any confidence (LOW/MEDIUM/HIGH)
-    # (no else needed - continues to other checks)
     
-    # RULE 2: Event type must be global-scale
     event_type = event_payload.get("event_type")
     if event_type not in ALLOWED_EVENT_TYPES:
         return False
     
-    # RULE 3: Source must be credible
     if source not in ALLOWED_SOURCES:
         return False
     
-    # RULE 4: Must mention at least ONE global entity
     entities = event_payload.get("entities", [])
     has_global_entity = any(
         entity.upper() in GLOBAL_ENTITIES 
@@ -104,27 +78,15 @@ def should_accept_event(event_payload: Dict[str, Any]) -> bool:
     if not has_global_entity:
         return False
     
-    # RULE 5: Anti-spam - reject duplicates
     if _last_accepted_event is not None:
         if events_are_identical(event_payload, _last_accepted_event):
             return False
     
-    # Accept and store
     _last_accepted_event = event_payload.copy()
     return True
 
 
 def events_are_identical(event1: Dict[str, Any], event2: Dict[str, Any]) -> bool:
-    """
-    Compare two events for identity.
-    
-    Args:
-        event1: First event payload
-        event2: Second event payload
-    
-    Returns:
-        bool: True if events are identical
-    """
     return (
         event1.get("event_type") == event2.get("event_type") and
         event1.get("source") == event2.get("source") and
@@ -134,29 +96,16 @@ def events_are_identical(event1: Dict[str, Any], event2: Dict[str, Any]) -> bool
 
 
 def reset_state() -> None:
-    """Reset anti-spam state. Used for testing."""
     global _last_accepted_event
     _last_accepted_event = None
 
 
 def normalize_event(event: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Normalize event fields for consistent filtering.
-    Handles case sensitivity and source mapping.
-    
-    Args:
-        event: Raw event dict from detection
-    
-    Returns:
-        dict: Normalized event
-    """
     event = event.copy()
 
-    # Normalize confidence to uppercase
     if "confidence" in event:
         event["confidence"] = event["confidence"].upper()
 
-    # Map alternative source names to standard values
     SOURCE_MAP = {
         "TRUMP": "POLITICAL_STATEMENT",
         "TRUMP_SOCIAL": "POLITICAL_STATEMENT",
@@ -169,7 +118,6 @@ def normalize_event(event: Dict[str, Any]) -> Dict[str, Any]:
             event["source"].upper()
         )
 
-    # Normalize entities to uppercase
     if "entities" in event and isinstance(event["entities"], list):
         event["entities"] = [e.upper() for e in event["entities"]]
 
@@ -177,16 +125,6 @@ def normalize_event(event: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def process_event(event_payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    """
-    Main entry point: filter + format for M5 device.
-    
-    Args:
-        event_payload: Raw event dict from detection module
-    
-    Returns:
-        dict: M5-compatible payload with keys: event_type, confidence, symbol
-        None: If event rejected by filters
-    """
     if not should_accept_event(event_payload):
         return None
     
@@ -207,16 +145,6 @@ def process_event(event_payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
 
 
 def process_raw_text(raw_text: str) -> Optional[Dict[str, Any]]:
-    """
-    Integration point: raw text → detection → filtering → M5 payload
-    
-    Args:
-        raw_text: Raw input text (news, social post, statement)
-    
-    Returns:
-        dict: M5-compatible payload if accepted
-        None: If event rejected or detection failed
-    """
     try:
         from detection_adapter import detect
 
@@ -233,7 +161,6 @@ def process_raw_text(raw_text: str) -> Optional[Dict[str, Any]]:
         print("FINAL RESULT:", result)
         
         return result
-    return event
 
     except ImportError as e:
         print("IMPORT ERROR:", e)
@@ -242,12 +169,11 @@ def process_raw_text(raw_text: str) -> Optional[Dict[str, Any]]:
     except Exception as e:
         print("PIPELINE ERROR:", e)
         return None
-        return event
+
 
 if __name__ == "__main__":
     print("=== EVENT CONTRACT TESTS ===\n")
     
-    # Test 1: Trump HIGH confidence (should pass)
     test_1 = {
         "event_type": "POLITICAL_STATEMENT",
         "confidence": "HIGH",
@@ -258,12 +184,10 @@ if __name__ == "__main__":
     print(f"Test 1 (Trump HIGH): {result_1}")
     print(f"  Status: {'✅ ACCEPTED' if result_1 else '❌ REJECTED'}\n")
     
-    # Test 2: Duplicate (should be rejected)
     result_2 = process_event(test_1)
     print(f"Test 2 (Duplicate): {result_2}")
     print(f"  Status: {'✅ ACCEPTED' if result_2 else '❌ REJECTED (anti-spam)'}\n")
     
-    # Test 3: Trump LOW confidence (should pass - Trump bypass)
     reset_state()
     test_3 = {
         "event_type": "POLITICAL_STATEMENT",
@@ -275,7 +199,6 @@ if __name__ == "__main__":
     print(f"Test 3 (Trump LOW): {result_3}")
     print(f"  Status: {'✅ ACCEPTED' if result_3 else '❌ REJECTED'}\n")
     
-    # Test 4: News MEDIUM confidence (should be rejected)
     test_4 = {
         "event_type": "GLOBAL_EVENT",
         "confidence": "MEDIUM",
@@ -286,7 +209,6 @@ if __name__ == "__main__":
     print(f"Test 4 (News MEDIUM): {result_4}")
     print(f"  Status: {'✅ ACCEPTED' if result_4 else '❌ REJECTED (not HIGH)'}\n")
     
-    # Test 5: News HIGH confidence (should pass)
     test_5 = {
         "event_type": "GLOBAL_EVENT",
         "confidence": "HIGH",
@@ -297,7 +219,6 @@ if __name__ == "__main__":
     print(f"Test 5 (News HIGH): {result_5}")
     print(f"  Status: {'✅ ACCEPTED' if result_5 else '❌ REJECTED'}\n")
     
-    # Test 6: Trump MEDIUM confidence new token mention (should pass)
     reset_state()
     test_6 = {
         "event_type": "POLITICAL_STATEMENT",
