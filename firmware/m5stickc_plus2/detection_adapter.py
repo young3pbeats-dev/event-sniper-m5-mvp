@@ -80,7 +80,7 @@ def detect(raw_text: str) -> dict:
 
     result = json.loads(response.json()["choices"][0]["message"]["content"])
 
-  print("DEBUG SOURCE BEFORE OVERRIDE:", result.get("source"))
+    print("DEBUG SOURCE BEFORE OVERRIDE:", result.get("source"))
 
 
     # Hard override Trump
