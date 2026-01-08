@@ -311,5 +311,3 @@ if __name__ == "__main__":
     
     print("=== SUMMARY ===")
     print("Expected: ✅ Trump HIGH → ❌ Duplicate → ✅ Trump LOW → ❌ News MEDIUM → ✅ News HIGH → ✅ Trump MEDIUM token")
-```
-
