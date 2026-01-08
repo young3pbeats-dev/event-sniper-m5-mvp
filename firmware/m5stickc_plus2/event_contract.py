@@ -109,6 +109,7 @@ def normalize_event(event: Dict[str, Any]) -> Dict[str, Any]:
     SOURCE_MAP = {
         "TRUMP": "POLITICAL_STATEMENT",
         "TRUMP_SOCIAL": "POLITICAL_STATEMENT",
+        "TRUMP_STATEMENT": "POLITICAL_STATEMENT",
         "NEWS": "GLOBAL_NEWS",
         "GLOBAL": "GLOBAL_NEWS"
     }
@@ -159,7 +160,6 @@ def process_raw_text(raw_text: str) -> Optional[Dict[str, Any]]:
         
         result = process_event(normalized)
         print("FINAL RESULT:", result)
-        
         return result
 
     except ImportError as e:
